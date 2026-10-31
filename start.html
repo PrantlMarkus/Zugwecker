@@ -213,14 +213,14 @@
 
       <!-- Action Buttons for Pixel 10 -->
       <div class="space-y-2.5">
-        <button id="setAndroidAlarmBtn" class="w-full bg-gradient-to-r from-oebb-red to-red-600 hover:from-red-600 hover:to-oebb-red text-white py-3.5 px-4 rounded-xl font-bold flex items-center justify-center space-x-2 shadow-lg glow-red transition">
+        <a id="setAndroidAlarmBtn" href="#" class="w-full bg-gradient-to-r from-oebb-red to-red-600 hover:from-red-600 hover:to-oebb-red text-white py-3.5 px-4 rounded-xl font-bold flex items-center justify-center space-x-2 shadow-lg glow-red transition text-center cursor-pointer">
           <i class="fa-brands fa-android text-lg"></i>
           <span>Wecker auf Pixel 10 stellen</span>
-        </button>
+        </a>
         
         <!-- Toast feedback message -->
         <div id="alarmFeedback" class="hidden p-3 bg-emerald-950/80 border border-emerald-800 text-emerald-200 rounded-xl text-xs text-center font-medium">
-          <i class="fa-solid fa-check-circle mr-1 text-emerald-400"></i> Weckzeit in Zwischenablage kopiert!
+          <i class="fa-solid fa-check-circle mr-1 text-emerald-400"></i> Weckzeit in Zwischenablage kopiert & Wecker-Befehl an Android gesendet!
         </div>
 
         <button id="downloadIcsBtn" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 py-2.5 px-4 rounded-xl font-medium text-xs flex items-center justify-center space-x-2 border border-slate-700 transition">
@@ -529,18 +529,15 @@
         optionTransfer.classList.add("hidden");
       }
 
+      // Wecker Intent-URL direkt auf dem Button aktualisieren
+      updateAlarmIntent();
+
       const modal = document.getElementById("alarmModal");
       modal.classList.remove("opacity-0", "pointer-events-none");
       modal.querySelector(".glass-card").classList.remove("translate-y-full");
     }
 
-    function closeModal() {
-      const modal = document.getElementById("alarmModal");
-      modal.classList.add("opacity-0", "pointer-events-none");
-      modal.querySelector(".glass-card").classList.add("translate-y-full");
-    }
-
-    function setPixelAlarm() {
+    function updateAlarmIntent() {
       if (!selectedConnection) return;
 
       const selectedOption = document.querySelector('input[name="alarmTrigger"]:checked').value;
@@ -557,7 +554,31 @@
 
       const [hours, minutes] = alarmTimeStr.split(':').map(Number);
 
-      // Kopieren der Uhrzeit & Nachricht in die Zwischenablage für schnelles Einfügen/Erinnern
+      // 1. Android Intent für Google Uhr / Clock App (Funktioniert nativ auf Google Pixel)
+      const androidIntent = `intent:#Intent;action=android.intent.action.SET_ALARM;i.android.intent.extra.alarm.HOUR=${hours};i.android.intent.extra.alarm.MINUTES=${minutes};s.android.intent.extra.alarm.MESSAGE=${encodeURIComponent(alarmMessage)};b.android.intent.extra.alarm.SKIP_UI=false;end`;
+
+      const alarmBtn = document.getElementById("setAndroidAlarmBtn");
+      alarmBtn.href = androidIntent;
+    }
+
+    function closeModal() {
+      const modal = document.getElementById("alarmModal");
+      modal.classList.add("opacity-0", "pointer-events-none");
+      modal.querySelector(".glass-card").classList.add("translate-y-full");
+    }
+
+    function setPixelAlarm(e) {
+      if (!selectedConnection) return;
+
+      const selectedOption = document.querySelector('input[name="alarmTrigger"]:checked').value;
+      let alarmTimeStr = selectedOption === "arrival" ? 
+        subtractMinutes(selectedConnection.arr, 3) : 
+        subtractMinutes(selectedConnection.transferTime, 3);
+      let alarmMessage = selectedOption === "arrival" ? 
+        `Ankunft: ${selectedConnection.to} (${selectedConnection.train})` : 
+        `Umstieg: ${selectedConnection.transferStation} (${selectedConnection.train})`;
+
+      // Zwischenablage als Backup sichern
       const clipText = `${alarmTimeStr} - ${alarmMessage}`;
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(clipText).catch(() => {});
@@ -568,18 +589,6 @@
       if (feedback) {
         feedback.classList.remove("hidden");
         setTimeout(() => feedback.classList.add("hidden"), 4000);
-      }
-
-      // Standard Android Intent Syntax für Google DeskClock (Google Uhr App auf Pixel)
-      const intentUrl = `intent:#Intent;action=android.intent.action.SET_ALARM;i.android.intent.extra.alarm.HOUR=${hours};i.android.intent.extra.alarm.MINUTES=${minutes};s.android.intent.extra.alarm.MESSAGE=${encodeURIComponent(alarmMessage)};b.android.intent.extra.alarm.SKIP_UI=false;package=com.google.android.deskclock;end`;
-
-      // Fallback Scheme für Android Clock
-      const altScheme = `android-app://com.google.android.deskclock`;
-
-      try {
-        window.location.href = intentUrl;
-      } catch (e) {
-        window.location.href = altScheme;
       }
     }
 
@@ -639,6 +648,11 @@ END:VCALENDAR`;
       });
       document.getElementById("departureTime").addEventListener("change", (e) => {
         renderConnections(e.target.value);
+      });
+
+      // Event listener für Radio Buttons im Modal
+      document.querySelectorAll('input[name="alarmTrigger"]').forEach(radio => {
+        radio.addEventListener("change", updateAlarmIntent);
       });
 
       document.getElementById("closeModal").addEventListener("click", closeModal);
