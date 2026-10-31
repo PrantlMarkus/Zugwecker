@@ -217,6 +217,12 @@
           <i class="fa-brands fa-android text-lg"></i>
           <span>Wecker auf Pixel 10 stellen</span>
         </button>
+        
+        <!-- Toast feedback message -->
+        <div id="alarmFeedback" class="hidden p-3 bg-emerald-950/80 border border-emerald-800 text-emerald-200 rounded-xl text-xs text-center font-medium">
+          <i class="fa-solid fa-check-circle mr-1 text-emerald-400"></i> Weckzeit in Zwischenablage kopiert!
+        </div>
+
         <button id="downloadIcsBtn" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 py-2.5 px-4 rounded-xl font-medium text-xs flex items-center justify-center space-x-2 border border-slate-700 transition">
           <i class="fa-solid fa-calendar-plus"></i>
           <span>Als Kalender-Erinnerung (.ics) herunterladen</span>
@@ -224,7 +230,7 @@
       </div>
 
       <p class="text-[11px] text-slate-400 text-center mt-3">
-        <i class="fa-solid fa-circle-info mr-1 text-oebb-red"></i> Öffnet direkt die Google Uhr-App auf deinem Pixel.
+        <i class="fa-solid fa-circle-info mr-1 text-oebb-red"></i> Öffnet die Google Uhr App auf deinem Pixel.
       </p>
 
     </div>
@@ -543,16 +549,38 @@
 
       if (selectedOption === "arrival") {
         alarmTimeStr = subtractMinutes(selectedConnection.arr, 3);
-        alarmMessage = `Ankunft in 3 Min: ${selectedConnection.to} (${selectedConnection.train})`;
+        alarmMessage = `Ankunft: ${selectedConnection.to} (${selectedConnection.train})`;
       } else {
         alarmTimeStr = subtractMinutes(selectedConnection.transferTime, 3);
-        alarmMessage = `Umstieg in 3 Min: ${selectedConnection.transferStation} (${selectedConnection.train})`;
+        alarmMessage = `Umstieg: ${selectedConnection.transferStation} (${selectedConnection.train})`;
       }
 
       const [hours, minutes] = alarmTimeStr.split(':').map(Number);
-      const intentUrl = `intent:#Intent;action=android.intent.action.SET_ALARM;i.android.intent.extra.alarm.HOUR=${hours};i.android.intent.extra.alarm.MINUTES=${minutes};s.android.intent.extra.alarm.MESSAGE=${encodeURIComponent(alarmMessage)};b.android.intent.extra.alarm.SKIP_UI=false;end`;
 
-      window.location.href = intentUrl;
+      // Kopieren der Uhrzeit & Nachricht in die Zwischenablage für schnelles Einfügen/Erinnern
+      const clipText = `${alarmTimeStr} - ${alarmMessage}`;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(clipText).catch(() => {});
+      }
+
+      // Visual Feedback
+      const feedback = document.getElementById("alarmFeedback");
+      if (feedback) {
+        feedback.classList.remove("hidden");
+        setTimeout(() => feedback.classList.add("hidden"), 4000);
+      }
+
+      // Standard Android Intent Syntax für Google DeskClock (Google Uhr App auf Pixel)
+      const intentUrl = `intent:#Intent;action=android.intent.action.SET_ALARM;i.android.intent.extra.alarm.HOUR=${hours};i.android.intent.extra.alarm.MINUTES=${minutes};s.android.intent.extra.alarm.MESSAGE=${encodeURIComponent(alarmMessage)};b.android.intent.extra.alarm.SKIP_UI=false;package=com.google.android.deskclock;end`;
+
+      // Fallback Scheme für Android Clock
+      const altScheme = `android-app://com.google.android.deskclock`;
+
+      try {
+        window.location.href = intentUrl;
+      } catch (e) {
+        window.location.href = altScheme;
+      }
     }
 
     function downloadICS() {
